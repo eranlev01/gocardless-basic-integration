@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoCardless Payment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/zod@3.16.1/dist/index.min.js"></script>
+  </head>
+  <body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <!-- Form Container -->
+    <div class="w-full max-w-lg bg-white shadow-lg rounded-lg p-8">
+      <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">
+        Pay with GoCardless
+      </h1>
+
+      <form id="paymentForm" class="space-y-6">
+        <!-- Amount Input -->
+        <div>
+          <label for="amount" class="block text-lg font-medium text-gray-700"
+            >Amount</label
+          >
+          <input
+            type="number"
+            id="amount"
+            name="amount"
+            class="mt-2 block w-full p-4 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+            required
+          />
+          <p id="amountError" class="text-red-600 text-sm mt-2 hidden">
+            Please enter a valid amount.
+          </p>
+        </div>
+
+        <!-- Currency Input -->
+        <div>
+          <label for="currency" class="block text-lg font-medium text-gray-700"
+            >Currency</label
+          >
+          <input
+            type="text"
+            id="currency"
+            name="currency"
+            value="AUD"
+            class="mt-2 block w-full p-4 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+            required
+          />
+          <p id="currencyError" class="text-red-600 text-sm mt-2 hidden">
+            Please enter a valid currency code (e.g., GBP).
+          </p>
+        </div>
+
+        <!-- Name Input -->
+        <div>
+          <label for="name" class="block text-lg font-medium text-gray-700"
+            >Name</label
+          >
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="mt-2 block w-full p-4 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+            required
+          />
+          <p id="nameError" class="text-red-600 text-sm mt-2 hidden">
+            Please enter a valid name.
+          </p>
+        </div>
+
+        <!-- Email Input -->
+        <div>
+          <label for="email" class="block text-lg font-medium text-gray-700"
+            >Email</label
+          >
+          <input
+            type="email"
+            id="email"
+            name="email"
+            class="mt-2 block w-full p-4 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+            required
+          />
+          <p id="emailError" class="text-red-600 text-sm mt-2 hidden">
+            Please enter a valid email address.
+          </p>
+        </div>
+
+        <!-- Submit Button -->
+        <div>
+          <button
+            type="submit"
+            class="w-full bg-indigo-600 text-white py-3 px-6 rounded-md shadow-lg text-lg font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Pay Now
+          </button>
+        </div>
+      </form>
+
+      <!-- Response Message -->
+      <p
+        id="responseMessage"
+        class="mt-6 text-center text-sm text-gray-600"
+      ></p>
+    </div>
+
+    <script>
+      document
+        .getElementById("paymentForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          // Define the Zod schema
+          const schema = z.object({
+            amount: z.number().positive().nonnegative(),
+            currency: z.string().length(3),
+            name: z.string().min(1, "Name is required"),
+            email: z.string().email("Invalid email address"),
+          });
+
+          // Collect input values
+          const amount = parseFloat(document.getElementById("amount").value);
+          const currency = document.getElementById("currency").value;
+          const name = document.getElementById("name").value;
+          const email = document.getElementById("email").value;
+
+          // Validate the inputs
+          const result = schema.safeParse({ amount, currency, name, email });
+
+          // Hide all error messages
+          document.getElementById("amountError").classList.add("hidden");
+          document.getElementById("currencyError").classList.add("hidden");
+          document.getElementById("nameError").classList.add("hidden");
+          document.getElementById("emailError").classList.add("hidden");
+
+          if (!result.success) {
+            // Show error messages based on validation failure
+            result.error.errors.forEach((error) => {
+              const errorId = error.path[0] + "Error";
+              document.getElementById(errorId).textContent = error.message;
+              document.getElementById(errorId).classList.remove("hidden");
+            });
+            return;
+          }
+
+          const customer = {
+            given_name: name,
+            email: email,
+          };
+
+          try {
+            const response = await fetch("/create-payment", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                amount: amount * 100,
+                currency,
+                customer,
+              }), // convert to pence/cents
+            });
+
+            const data = await response.json();
+            console.log("Payment created:", data);
+            document.getElementById("responseMessage").textContent =
+              "Payment successful!";
+            document
+              .getElementById("responseMessage")
+              .classList.add("text-green-600");
+          } catch (error) {
+            console.error("Error:", error);
+            document.getElementById("responseMessage").textContent =
+              "Payment failed!";
+            document
+              .getElementById("responseMessage")
+              .classList.add("text-red-600");
+          }
+        });
+    </script>
+  </body>
+</html>
